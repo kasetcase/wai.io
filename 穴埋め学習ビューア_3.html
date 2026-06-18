@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>歴史 学習ビューア</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Hiragino Kaku Gothic Pro', 'Meiryo', sans-serif;
+  background: #1e1e1e;
+  color: #ccc;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ===== TITLE BAR ===== */
+.titlebar {
+  background: #3c3c3c;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  flex-shrink: 0;
+  user-select: none;
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot-red { background: #ff5f57; }
+.dot-yellow { background: #ffbd2e; }
+.dot-green { background: #28c840; }
+.titlebar-name { font-size: 0.78rem; color: #aaa; margin-left: auto; margin-right: auto; }
+
+/* ===== MENU BAR ===== */
+.menubar {
+  background: #2d2d2d;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 2px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+.menu-item {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: #ccc;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.menu-item:hover { background: #3a3a3a; }
+
+/* ===== MAIN LAYOUT ===== */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== ACTIVITY BAR ===== */
+.activity-bar {
+  width: 48px;
+  background: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 4px;
+  flex-shrink: 0;
+  border-right: 1px solid #1a1a1a;
+}
+.activity-icon {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #858585;
+  transition: color 0.15s;
+  position: relative;
+}
+.activity-icon:hover { color: #ddd; }
+.activity-icon.active { color: #fff; }
+.activity-icon.active::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 6px; bottom: 6px;
+  width: 2px;
+  background: #fff;
+  border-radius: 2px;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  width: 240px;
+  background: #252526;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border-right: 1px solid #1a1a1a;
+  overflow: hidden;
+}
+.sidebar-header {
+  padding: 10px 12px 6px;
+  font-size: 0.7rem;
+  color: #bbb;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.sidebar-body { flex: 1; overflow-y: auto; }
+.sidebar-body::-webkit-scrollbar { width: 4px; }
+.sidebar-body::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
+
+/* folder / file tree */
+.tree-folder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 10px;
+  font-size: 0.84rem;
+  color: #ccc;
+  cursor: pointer;
+  user-select: none;
+}
+.tree-folder:hover { background: #2a2d2e; }
+.tree-folder-icon { font-size: 0.75rem; color: #888; transition: transform 0.15s; }
+.tree-folder-icon.open { transform: rotate(90deg); }
+.tree-folder-emoji { font-size: 0.95rem; }
+.tree-folder-name { flex: 1; }
+.tree-folder-add {
+  opacity: 0;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  color: #888;
+  cursor: pointer;
+}
+.tree-folder:hover .tree-folder-add { opacity: 1; }
+.tree-folder-add:hover { color: #fff; }
+
+.tree-children { display: none; }
+.tree-children.open { display: block; }
+
+.tree-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 28px;
+  font-size: 0.82rem;
+  color: #bbb;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+.tree-file:hover { background: #2a2d2e; }
+.tree-file.active { background: #37373d; color: #fff; }
+.tree-file-icon { font-size: 0.85rem; }
+.tree-file-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-file-remove {
+  opacity: 0;
+  font-size: 0.7rem;
+  color: #666;
+  padding: 2px 4px;
+}
+.tree-file:hover .tree-file-remove { opacity: 1; }
+.tree-file-remove:hover { color: #e05; }
+
+/* folder drop zone */
+.folder-drop {
+  border: 1px dashed #444;
+  border-radius: 6px;
+  margin: 6px 10px;
+  padding: 8px;
+  font-size: 0.75rem;
+  color: #666;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.folder-drop:hover, .folder-drop.drag { border-color: #6c8fff; color: #6c8fff; background: rgba(108,143,255,0.05); }
+.folder-drop input { display: none; }
+
+/* sidebar bottom actions */
+.sidebar-actions {
+  padding: 8px 10px;
+  border-top: 1px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sidebar-action-btn {
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: 1px solid #3a3a3a;
+  background: transparent;
+  color: #aaa;
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+.sidebar-action-btn:hover { background: #37373d; color: #ddd; }
+
+/* ===== EDITOR AREA ===== */
+.editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #1e1e1e;
+}
+
+/* tab bar */
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  background: #252526;
+  border-bottom: 1px solid #1a1a1a;
+  overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 35px;
+}
+.tab-bar::-webkit-scrollbar { height: 2px; }
+.tab-bar::-webkit-scrollbar-thumb { background: #555; }
+
+.editor-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  color: #888;
+  cursor: pointer;
+  border-right: 1px solid #1a1a1a;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-top: 1px solid transparent;
+  transition: background 0.1s;
+}
+.editor-tab:hover { background: #2d2d2d; color: #ccc; }
+.editor-tab.active {
+  background: #1e1e1e;
+  color: #fff;
+  border-top: 1px solid #6c8fff;
+}
+.editor-tab-icon { font-size: 0.82rem; }
+.editor-tab-close {
+  font-size: 0.7rem;
+  color: #666;
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+.editor-tab-close:hover { background: #3a3a3a; color: #fff; }
+
+/* breadcrumb */
+.breadcrumb {
+  background: #1e1e1e;
+  padding: 4px 14px;
+  font-size: 0.75rem;
+  color: #858585;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.breadcrumb span { color: #ccc; }
+
+/* toolbar */
+.toolbar {
+  background: #2d2d2d;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.toolbar-btn {
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid #3a3a3a;
+  background: #3c3c3c;
+  color: #ccc;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.toolbar-btn:hover { background: #4a4a4a; color: #fff; border-color: #555; }
+.toolbar-btn.accent { background: #0e639c; border-color: #1177bb; color: #fff; }
+.toolbar-btn.accent:hover { background: #1177bb; }
+.toolbar-sep { width: 1px; height: 18px; background: #3a3a3a; margin: 0 2px; }
+.toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.progress-text { font-size: 0.75rem; color: #858585; }
+.progress-mini { width: 80px; height: 3px; background: #3a3a3a; border-radius: 2px; overflow: hidden; }
+.progress-mini-fill { height: 100%; background: #6c8fff; border-radius: 2px; transition: width 0.3s; }
+
+/* editor content */
+.editor-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 40px;
+  line-height: 1.7;
+}
+.editor-content::-webkit-scrollbar { width: 8px; }
+.editor-content::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
+
+/* welcome screen */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #555;
+  text-align: center;
+  gap: 12px;
+}
+.welcome-icon { font-size: 4rem; }
+.welcome-title { font-size: 1.2rem; color: #888; font-weight: 600; }
+.welcome-sub { font-size: 0.85rem; color: #555; line-height: 1.8; }
+
+/* ===== MARKDOWN STYLES ===== */
+.editor-content h1 { font-size: 1.7rem; color: #dcdcdc; margin: 20px 0 14px; padding-bottom: 6px; border-bottom: 1px solid #3a3a3a; }
+.editor-content h2 { font-size: 1.2rem; color: #9cdcfe; margin: 24px 0 10px; }
+.editor-content h3 { font-size: 1rem; color: #4ec9b0; margin: 18px 0 8px; }
+.editor-content p { color: #d4d4d4; margin-bottom: 10px; }
+.editor-content ul, .editor-content ol { padding-left: 22px; margin-bottom: 10px; }
+.editor-content li { color: #d4d4d4; margin-bottom: 3px; }
+.editor-content hr { border: none; border-top: 1px solid #3a3a3a; margin: 20px 0; }
+.editor-content pre {
+  background: #2d2d2d;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+  font-size: 0.85rem;
+  color: #ce9178;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+.editor-content table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 0.88rem; }
+.editor-content th { background: #2d2d2d; color: #9cdcfe; padding: 8px 12px; border: 1px solid #3a3a3a; text-align: left; }
+.editor-content td { padding: 7px 12px; border: 1px solid #2d2d2d; color: #d4d4d4; }
+.editor-content tr:nth-child(even) td { background: #252526; }
+.editor-content a { color: #6c8fff; }
+
+/* ===== KEYWORD ===== */
+.kw {
+  display: inline-block;
+  background: rgba(86,156,214,0.18);
+  color: #569cd6;
+  border-radius: 3px;
+  padding: 1px 6px;
+  cursor: pointer;
+  font-weight: 700;
+  border: 1px solid rgba(86,156,214,0.3);
+  transition: background 0.15s;
+  user-select: none;
+}
+.kw:hover { background: rgba(86,156,214,0.3); }
+.kw.hidden {
+  background: #2d2d2d;
+  color: #2d2d2d;
+  border: 1px solid #3a3a3a;
+  min-width: 44px;
+  cursor: pointer;
+}
+.kw.hidden:hover { border-color: #569cd6; }
+
+/* ===== STATUS BAR ===== */
+.statusbar {
+  background: #007acc;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.status-item { font-size: 0.72rem; color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 4px; }
+.status-right { margin-left: auto; }
+
+/* resize handle */
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+}
+.resize-handle:hover { background: #6c8fff; }
+</style>
+</head>
+<body>
+
+<!-- TITLE BAR -->
+<div class="titlebar">
+  <div class="titlebar-dot dot-red"></div>
+  <div class="titlebar-dot dot-yellow"></div>
+  <div class="titlebar-dot dot-green"></div>
+  <div class="titlebar-name">歴史学習ビューア — 穴埋めモード</div>
+</div>
+
+<!-- MENU BAR -->
+<div class="menubar">
+  <div class="menu-item" onclick="document.getElementById('folderUpload').click()">ファイル</div>
+  <div class="menu-item" onclick="hideAll()">表示</div>
+  <div class="menu-item" onclick="shuffleHide()">ランダム</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- ACTIVITY BAR -->
+  <div class="activity-bar">
+    <div class="activity-icon active" title="エクスプローラー">📁</div>
+    <div class="activity-icon" title="検索" onclick="alert('準備中')">🔍</div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">エクスプローラー</div>
+    <div class="sidebar-body" id="sidebarBody">
+
+      <!-- drop zone for folder -->
+      <label class="folder-drop" id="folderDrop">
+        <input type="file" id="folderUpload" accept=".md" multiple webkitdirectory>
+        📂 フォルダを開く<br>
+        <span style="font-size:0.7rem;color:#555">または MDファイルをドロップ</span>
+      </label>
+
+      <div id="fileTree"></div>
+    </div>
+
+    <div class="sidebar-actions">
+      <label class="sidebar-action-btn" style="cursor:pointer">
+        <input type="file" accept=".md" multiple style="display:none" id="addFiles">
+        ＋ MDファイルを追加
+      </label>
+    </div>
+  </div>
+
+  <div class="resize-handle" id="resizeHandle"></div>
+
+  <!-- EDITOR -->
+  <div class="editor-area">
+
+    <!-- TAB BAR -->
+    <div class="tab-bar" id="tabBar"></div>
+
+    <!-- BREADCRUMB -->
+    <div class="breadcrumb" id="breadcrumb" style="display:none">
+      📁 <span id="bcFolder">—</span> › 📄 <span id="bcFile">—</span>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="toolbar" id="toolbar" style="display:none">
+      <button class="toolbar-btn accent" onclick="hideAll()">🙈 全部隠す</button>
+      <button class="toolbar-btn" onclick="showAll()">👁 全部見る</button>
+      <div class="toolbar-sep"></div>
+      <button class="toolbar-btn" onclick="shuffleHide()">🎲 ランダム半分</button>
+      <div class="toolbar-right">
+        <span class="progress-text" id="progressText">0 / 0</span>
+        <div class="progress-mini"><div class="progress-mini-fill" id="progressFill"></div></div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="editor-content" id="editorContent">
+      <div class="welcome">
+        <div class="welcome-icon">📚</div>
+        <div class="welcome-title">歴史学習ビューア</div>
+        <div class="welcome-sub">
+          左の「フォルダを開く」からフォルダを選ぶか<br>
+          MDファイルをドラッグ＆ドロップしてください<br><br>
+          <span style="color:#4ec9b0">太字の単語</span>がボタンで隠せます
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <div class="status-item">📖 穴埋め学習モード</div>
+  <div class="status-item" id="statusFile">ファイル未選択</div>
+  <div class="status-item status-right" id="statusCount">単語: 0個</div>
+</div>
+
+<script>
+// ===== STATE =====
+let folders = {}; // { folderName: [ {name, content, html} ] }
+let openTabs = []; // { folderId, fileIdx, name }
+let activeTabIdx = -1;
+
+// ===== FILE INPUT =====
+document.getElementById('folderUpload').addEventListener('change', e => loadFiles(e.target.files));
+document.getElementById('addFiles').addEventListener('change', e => loadFiles(e.target.files));
+
+function loadFiles(fileList) {
+  Array.from(fileList).forEach(file => {
+    if (!file.name.endsWith('.md')) return;
+    // detect folder from webkitRelativePath or use "その他"
+    const parts = (file.webkitRelativePath || file.name).split('/');
+    const folderName = parts.length > 1 ? parts[0] : 'その他';
+    const fileName = parts[parts.length - 1];
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+      if (!folders[folderName]) folders[folderName] = [];
+      // avoid duplicates
+      if (folders[folderName].find(f => f.name === fileName)) return;
+      folders[folderName].push({ name: fileName, content: ev.target.result, html: mdToHtml(ev.target.result) });
+      renderTree();
+    };
+    reader.readAsText(file);
+  });
+}
+
+// ===== DRAG & DROP on whole window =====
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); loadFiles(e.dataTransfer.files); });
+
+// ===== TREE =====
+let folderOpen = {};
+
+function renderTree() {
+  const tree = document.getElementById('fileTree');
+  tree.innerHTML = '';
+  document.getElementById('folderDrop').style.display = Object.keys(folders).length ? 'none' : '';
+
+  Object.keys(folders).sort().forEach(fName => {
+    const isOpen = folderOpen[fName] !== false;
+
+    const folderDiv = document.createElement('div');
+    folderDiv.innerHTML = `
+      <div class="tree-folder" onclick="toggleFolder('${fName}')">
+        <span class="tree-folder-icon ${isOpen ? 'open' : ''}">▶</span>
+        <span class="tree-folder-emoji">📁</span>
+        <span class="tree-folder-name">${fName}</span>
+        <label class="tree-folder-add" title="MDを追加" onclick="event.stopPropagation()">
+          ＋<input type="file" accept=".md" multiple style="display:none" onchange="addToFolder('${fName}', this.files)">
+        </label>
+      </div>
+      <div class="tree-children ${isOpen ? 'open' : ''}" id="fc_${CSS.escape(fName)}"></div>
+    `;
+    tree.appendChild(folderDiv);
+
+    const childEl = document.getElementById('fc_' + CSS.escape(fName));
+    folders[fName].forEach((file, idx) => {
+      const fileDiv = document.createElement('div');
+      const isActive = openTabs[activeTabIdx]?.folderId === fName && openTabs[activeTabIdx]?.fileIdx === idx;
+      fileDiv.className = 'tree-file' + (isActive ? ' active' : '');
+      fileDiv.innerHTML = `
+        <span class="tree-file-icon">📄</span>
+        <span class="tree-file-name">${file.name}</span>
+        <span class="tree-file-remove" onclick="event.stopPropagation(); removeFile('${fName}', ${idx})">✕</span>
+      `;
+      fileDiv.onclick = () => openFile(fName, idx);
+      childEl.appendChild(fileDiv);
+    });
+  });
+}
+
+function toggleFolder(fName) {
+  folderOpen[fName] = folderOpen[fName] === false ? true : false;
+  renderTree();
+}
+
+function addToFolder(fName, fileList) {
+  Array.from(fileList).forEach(file => {
+    if (!file.name.endsWith('.md')) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      if (folders[fName].find(f => f.name === file.name)) return;
+      folders[fName].push({ name: file.name, content: ev.target.result, html: mdToHtml(ev.target.result) });
+      renderTree();
+    };
+    reader.readAsText(file);
+  });
+}
+
+function removeFile(fName, idx) {
+  folders[fName].splice(idx, 1);
+  if (folders[fName].length === 0) delete folders[fName];
+  // close tab if open
+  openTabs = openTabs.filter(t => !(t.folderId === fName && t.fileIdx === idx));
+  if (activeTabIdx >= openTabs.length) activeTabIdx = openTabs.length - 1;
+  renderTree();
+  renderTabs();
+  if (activeTabIdx >= 0) loadTab(activeTabIdx);
+  else showWelcome();
+}
+
+// ===== OPEN FILE =====
+function openFile(fName, idx) {
+  const existing = openTabs.findIndex(t => t.folderId === fName && t.fileIdx === idx);
+  if (existing >= 0) { switchTab(existing); return; }
+
+  const file = folders[fName][idx];
+  openTabs.push({ folderId: fName, fileIdx: idx, name: file.name });
+  activeTabIdx = openTabs.length - 1;
+  renderTabs();
+  renderTree();
+  loadTab(activeTabIdx);
+}
+
+function switchTab(i) {
+  activeTabIdx = i;
+  renderTabs();
+  renderTree();
+  loadTab(i);
+}
+
+function closeTab(i, e) {
+  e.stopPropagation();
+  openTabs.splice(i, 1);
+  if (activeTabIdx >= openTabs.length) activeTabIdx = openTabs.length - 1;
+  renderTabs();
+  renderTree();
+  if (activeTabIdx >= 0) loadTab(activeTabIdx);
+  else showWelcome();
+}
+
+function loadTab(i) {
+  const tab = openTabs[i];
+  const file = folders[tab.folderId]?.[tab.fileIdx];
+  if (!file) return;
+
+  document.getElementById('editorContent').innerHTML = file.html;
+  document.getElementById('breadcrumb').style.display = 'flex';
+  document.getElementById('toolbar').style.display = 'flex';
+  document.getElementById('bcFolder').textContent = tab.folderId;
+  document.getElementById('bcFile').textContent = file.name;
+  document.getElementById('statusFile').textContent = file.name;
+
+  // default: all hidden
+  hideAll();
+  updateProgress();
+}
+
+function showWelcome() {
+  document.getElementById('editorContent').innerHTML = `
+    <div class="welcome">
+      <div class="welcome-icon">📚</div>
+      <div class="welcome-title">歴史学習ビューア</div>
+      <div class="welcome-sub">ファイルを選択してください</div>
+    </div>`;
+  document.getElementById('breadcrumb').style.display = 'none';
+  document.getElementById('toolbar').style.display = 'none';
+  document.getElementById('statusFile').textContent = 'ファイル未選択';
+}
+
+// ===== TABS =====
+function renderTabs() {
+  const bar = document.getElementById('tabBar');
+  bar.innerHTML = '';
+  openTabs.forEach((tab, i) => {
+    const el = document.createElement('div');
+    el.className = 'editor-tab' + (i === activeTabIdx ? ' active' : '');
+    el.innerHTML = `
+      <span class="editor-tab-icon">📄</span>
+      <span>${tab.name.replace('.md','')}</span>
+      <span class="editor-tab-close" onclick="closeTab(${i}, event)">✕</span>
+    `;
+    el.onclick = () => switchTab(i);
+    bar.appendChild(el);
+  });
+}
+
+// ===== MARKDOWN PARSER =====
+function mdToHtml(md) {
+  const lines = md.split('\n');
+  let html = '';
+  let inPre = false, preContent = '';
+  let inTable = false, tableRows = [];
+  let inList = false, listItems = [], listOrdered = false;
+
+  function flushList() {
+    if (!inList) return;
+    const tag = listOrdered ? 'ol' : 'ul';
+    html += `<${tag}>${listItems.map(i=>`<li>${inlineFmt(i)}</li>`).join('')}</${tag}>`;
+    listItems = []; inList = false;
+  }
+  function flushTable() {
+    if (!inTable || tableRows.length < 2) { inTable = false; tableRows = []; return; }
+    let t = '<table><thead><tr>' + tableRows[0].map(h=>`<th>${inlineFmt(h)}</th>`).join('') + '</tr></thead><tbody>';
+    for (let r = 2; r < tableRows.length; r++)
+      t += '<tr>' + tableRows[r].map(c=>`<td>${inlineFmt(c)}</td>`).join('') + '</tr>';
+    html += t + '</tbody></table>';
+    inTable = false; tableRows = [];
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i], line = raw.trimEnd();
+
+    if (line.startsWith('```')) {
+      if (!inPre) { flushList(); flushTable(); inPre = true; preContent = ''; }
+      else { html += `<pre><code>${esc(preContent.trimEnd())}</code></pre>`; inPre = false; }
+      continue;
+    }
+    if (inPre) { preContent += raw + '\n'; continue; }
+
+    if (line.includes('|') && !line.match(/^\s*$/)) {
+      flushList();
+      inTable = true;
+      const cells = line.split('|').slice(1,-1).map(c=>c.trim());
+      if (!cells.every(c=>/^[-: ]+$/.test(c))) tableRows.push(cells);
+      continue;
+    } else if (inTable) flushTable();
+
+    const hm = line.match(/^(#{1,3})\s+(.+)/);
+    if (hm) { flushList(); html += `<h${hm[1].length}>${inlineFmt(hm[2])}</h${hm[1].length}>`; continue; }
+
+    if (/^[-*]{3,}$/.test(line.trim())) { flushList(); html += '<hr>'; continue; }
+
+    const ulm = line.match(/^[\-\*]\s+(.+)/);
+    const olm = line.match(/^\d+[.。]\s+(.+)/);
+    if (ulm) { if (!inList||listOrdered){flushList();inList=true;listOrdered=false;} listItems.push(ulm[1]); continue; }
+    if (olm) { if (!inList||!listOrdered){flushList();inList=true;listOrdered=true;} listItems.push(olm[1]); continue; }
+    if (inList && !line.trim()) { flushList(); continue; }
+    if (inList) { flushList(); }
+
+    if (!line.trim()) { flushTable(); continue; }
+    flushTable();
+    html += `<p>${inlineFmt(line)}</p>`;
+  }
+  flushList(); flushTable();
+  if (inPre) html += `<pre><code>${esc(preContent)}</code></pre>`;
+  return html;
+}
+
+function inlineFmt(text) {
+  text = text.replace(/\*\*(.+?)\*\*/g, (_, w) =>
+    `<span class="kw hidden" onclick="toggleKw(this)">${esc(w)}</span>`);
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  text = text.replace(/`(.+?)`/g, '<code style="background:#2d2d2d;padding:1px 5px;border-radius:3px;color:#ce9178">$1</code>');
+  return text;
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ===== KEYWORD ACTIONS =====
+function toggleKw(el) { el.classList.toggle('hidden'); updateProgress(); }
+
+function hideAll() {
+  document.querySelectorAll('.kw').forEach(el => el.classList.add('hidden'));
+  updateProgress();
+}
+function showAll() {
+  document.querySelectorAll('.kw').forEach(el => el.classList.remove('hidden'));
+  updateProgress();
+}
+function shuffleHide() {
+  const all = [...document.querySelectorAll('.kw')].sort(() => Math.random() - 0.5);
+  all.forEach(el => el.classList.remove('hidden'));
+  all.slice(0, Math.ceil(all.length / 2)).forEach(el => el.classList.add('hidden'));
+  updateProgress();
+}
+
+function updateProgress() {
+  const all = document.querySelectorAll('.kw');
+  const shown = document.querySelectorAll('.kw:not(.hidden)');
+  const t = all.length, s = shown.length;
+  const pct = t > 0 ? (s / t * 100) : 0;
+  document.getElementById('progressText').textContent = `${s} / ${t} 個表示`;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('statusCount').textContent = `単語: ${t}個`;
+}
+
+// ===== RESIZE =====
+const handle = document.getElementById('resizeHandle');
+const sidebar = document.getElementById('sidebar');
+let dragging = false, startX, startW;
+handle.addEventListener('mousedown', e => { dragging = true; startX = e.clientX; startW = sidebar.offsetWidth; });
+document.addEventListener('mousemove', e => { if (!dragging) return; const w = Math.max(160, Math.min(400, startW + e.clientX - startX)); sidebar.style.width = w + 'px'; });
+document.addEventListener('mouseup', () => dragging = false);
+</script>
+</body>
+</html>
